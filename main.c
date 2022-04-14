@@ -4,22 +4,21 @@
 //#include <dsound.h>
 #include <GL/gl.h>
 #include <stdio.h>
+#include <stdlib.h>
 //#include <GL/glu.h>
 #include "khrplatform.h"
 #include "glext.h"
 //#include "Test1.h"
-#include "shader_code.h"
+#include "shader_code.h" 
 
 typedef void (*GenFP)(void); // any function ptr type would do
-static GenFP glFP[18];
-static GLuint FBO;
-static GLuint tex_output;
+static GenFP glFP[22];
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-const unsigned int SH_WIDTH = 1280;
-const unsigned int SH_HEIGHT = 720;
-const unsigned int SH_DEPTH = 3;//Extra Layer for Rendering Scene
+const GLuint SH_WIDTH = 1280;
+const GLuint SH_HEIGHT = 720; 
+const GLuint SH_DEPTH = 3;//Extra Layer for Rendering Scene
 
 const static char* glnames[]={
      "glGenTextures", "glActiveTexture", "glBindTexture", "glTexParameteri", 
@@ -27,13 +26,34 @@ const static char* glnames[]={
 	 "glCompileShader", "glCreateProgram", "glAttachShader", "glLinkProgram",
 	 "glGenFramebuffers", "glUseProgram", 
 	 "glBindFramebuffer", "glFramebufferTexture3D", 
-	 "glDispatchCompute", "glMemoryBarrier", "glBlitFramebuffer"
+	 "glDispatchCompute", "glMemoryBarrier", "glBlitFramebuffer",
+	 "glUniform1f", "glUniform1i", "glGetUniformLocation"
 };
-static void setShaders() {
-	//Mess around w i
+
+static 	PIXELFORMATDESCRIPTOR pfd; 
+static DEVMODE dmScreenSettings;
+
+int WINAPI WinMainCRTStartup()
+{   
+
+	dmScreenSettings.dmSize=sizeof(dmScreenSettings);		
+	dmScreenSettings.dmPelsWidth	= 1280;
+	dmScreenSettings.dmPelsHeight= 720;
+	dmScreenSettings.dmFields=DM_PELSWIDTH|DM_PELSHEIGHT;
+	ChangeDisplaySettings(&dmScreenSettings,CDS_FULLSCREEN); 
+ 
+	pfd.cColorBits = pfd.cDepthBits = 32; 
+	pfd.dwFlags    = PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;	
+	PVOID hDC = GetDC ( CreateWindow("edit", 0, WS_POPUP|WS_VISIBLE|WS_MAXIMIZE, 0, 0, 0 , 0, 0, 0, 0, 0) );         
+	SetPixelFormat ( hDC, ChoosePixelFormat ( hDC, &pfd) , &pfd );
+	wglMakeCurrent ( hDC, wglCreateContext(hDC) );
+	ShowCursor(FALSE);
+	
+	GLuint FBO;
+	GLuint tex_output;
 	int i;
-	for (i=0; i<18; i++) glFP[i] = (GenFP)wglGetProcAddress(glnames[i]);
-	((PFNGLGENTEXTURESEXTPROC)glFP[0])(1, &tex_output);
+	for (i=0; i<22; i++) glFP[i] = (GenFP)wglGetProcAddress(glnames[i]);
+	glGenTextures(1, &tex_output);
 	((PFNGLACTIVETEXTUREPROC)glFP[1])(GL_TEXTURE0);
 	//((PFNGLBINDTEXTURESPROC)glFP[2])(GL_TEXTURE_3D, tex_output);
 	glBindTexture(GL_TEXTURE_3D, tex_output);
@@ -49,35 +69,36 @@ static void setShaders() {
 	((PFNGLCOMPILESHADERPROC)glFP[8]) (ray_shader);
 	GLuint ray_program = ((PFNGLCREATEPROGRAMPROC)(glFP[9])) ();
 	((PFNGLATTACHSHADERPROC)glFP[10]) (ray_program, ray_shader);
-	((PFNGLLINKPROGRAMPROC)glFP[11]) (ray_shader);
+	((PFNGLLINKPROGRAMPROC)glFP[11]) (ray_program);
 	((PFNGLGENFRAMEBUFFERSPROC)glFP[12]) (1, &FBO);
-	((PFNGLUSEPROGRAMPROC)glFP[13]) (ray_shader);
-}
-
-int WINAPI WinMainCRTStartup()
-{              
-	PIXELFORMATDESCRIPTOR pfd;  
-	pfd.cColorBits = pfd.cDepthBits = 32; 
-	pfd.dwFlags    = PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;	
-	PVOID hDC = GetDC ( CreateWindow("edit", 0, 
-						WS_POPUP|WS_VISIBLE|WS_MAXIMIZE, 
-						0, 0, 0 , 0, 0, 0, 0, 0) );         
-	SetPixelFormat ( hDC, ChoosePixelFormat ( hDC, &pfd) , &pfd );
-	wglMakeCurrent ( hDC, wglCreateContext(hDC) );
-	ShowCursor(FALSE);  
+	((PFNGLUSEPROGRAMPROC)glFP[13]) (ray_program);
 	
-	setShaders();  
-	// setup code
-	do {
-		//glClear ( GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
-				int o = glGetError();
-		printf("%i", o);
-		((PFNGLBINDFRAMEBUFFERPROC)glFP[14]) (GL_FRAMEBUFFER, FBO);
-		((PFNGLFRAMEBUFFERTEXTURE3DPROC)glFP[15]) (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, tex_output, 0, 1);
-		((PFNGLBINDFRAMEBUFFERPROC)glFP[14]) (GL_DRAW_FRAMEBUFFER, 0);
-		((PFNGLDISPATCHCOMPUTEPROC)glFP[16]) (SH_WIDTH, SH_HEIGHT, SH_DEPTH);
-		((PFNGLMEMORYBARRIERPROC)glFP[17]) (GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		((PFNGLBLITFRAMEBUFFERPROC)glFP[18]) (0, 0, SH_WIDTH, SH_HEIGHT, 0, 0, SH_WIDTH, SH_HEIGHT, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	
+	PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)glFP[14];
+	PFNGLFRAMEBUFFERTEXTURE3DPROC glFramebufferTexture3D = (PFNGLFRAMEBUFFERTEXTURE3DPROC)glFP[15];
+	PFNGLDISPATCHCOMPUTEPROC glDispatchCompute = (PFNGLDISPATCHCOMPUTEPROC)glFP[16];
+	PFNGLMEMORYBARRIERPROC glMemoryBarrier = (PFNGLMEMORYBARRIERPROC)glFP[17];
+	PFNGLBLITFRAMEBUFFERPROC glBlitFramebuffer = (PFNGLBLITFRAMEBUFFERPROC)glFP[18];
+	PFNGLUNIFORM1FPROC glUniform1f = (PFNGLUNIFORM1FPROC)glFP[19];
+	PFNGLUNIFORM1IPROC glUniform1i = (PFNGLUNIFORM1IPROC)glFP[20];
+	PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)glFP[21];
+	float time = 0;
+	int stage = 0;
+	do {	
+		if(time < 10)
+		{
+			glClearColor(1, 1, 1, 1);
+			glClear ( GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+		glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, tex_output, 0, 1);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glDispatchCompute(SH_WIDTH, SH_HEIGHT, SH_DEPTH);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glBlitFramebuffer(0, 0, SH_WIDTH, SH_HEIGHT, 0, 0, SH_WIDTH, SH_HEIGHT, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		time+=1.;
+		glUniform1f(glGetUniformLocation(ray_program, VAR_TIME), time);
+		stage++; if(stage > 1){glUniform1i(glGetUniformLocation(ray_program, VAR_STAGE), 1); stage=0;}
 		SwapBuffers ( hDC );   
 	} while ( !GetAsyncKeyState(VK_ESCAPE) );
    
